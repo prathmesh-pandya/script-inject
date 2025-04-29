@@ -20,11 +20,39 @@
       // Determine page type
       const pageType = this.determinePageType();
 
+      // Get the Shopify domain/vendor ID
+      const vendorId = this.getShopifyDomain();
+
       // Send data to server for tracking
-      this.sendToServer(visitorData, pageType);
+      this.sendToServer(visitorData, pageType, vendorId);
 
       // Return the data for any other client-side usage
       return visitorData;
+    },
+
+    // Get the Shopify store domain
+    getShopifyDomain: function () {
+      // Try to get it from meta tags first (most reliable)
+      const shopifyDomainMeta = document.querySelector(
+        'meta[property="og:site_name"]'
+      );
+      if (shopifyDomainMeta && shopifyDomainMeta.content) {
+        return shopifyDomainMeta.content;
+      }
+
+      // Try to get from canonical link
+      const canonicalLink = document.querySelector('link[rel="canonical"]');
+      if (canonicalLink && canonicalLink.href) {
+        try {
+          const url = new URL(canonicalLink.href);
+          return url.hostname;
+        } catch (e) {
+          // URL parsing failed
+        }
+      }
+
+      // Fallback to current domain
+      return window.location.hostname;
     },
 
     // Determine if current page is a product page
@@ -309,7 +337,7 @@
     },
 
     // Send visitor data to server
-    sendToServer: function (visitorData, pageType) {
+    sendToServer: function (visitorData, pageType, vendorId) {
       // Format fingerprint string
       const fingerPrint = this.formatVisitorString(visitorData);
 
@@ -321,6 +349,7 @@
         fingerPrint: fingerPrint,
         page: pageType,
         token: storedToken,
+        vendorId: vendorId, // Add Shopify domain/vendor ID to the payload
       };
 
       // Send data via fetch API
@@ -356,6 +385,7 @@
         {
           fingerPrint,
           pageType,
+          vendorId,
           existingToken: storedToken ? true : false,
         }
       );
