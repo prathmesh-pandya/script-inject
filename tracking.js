@@ -8,7 +8,6 @@
   // API endpoint for tracking
   const TRACKING_API_URL =
     "https://tough-curiously-minnow.ngrok-free.app/api/v1/customer/page-visits";
-  const TOKEN_STORAGE_KEY = "visitor_tracking_token";
 
   // Create tracking object
   window.visitorTracker = {
@@ -26,8 +25,99 @@
       // Send data to server for tracking
       this.sendToServer(visitorData, pageType, vendorId);
 
+      // Setup cart tracking
+      this.setupCartTracking();
+
       // Return the data for any other client-side usage
       return visitorData;
+    },
+
+    // Setup listeners for add to cart buttons
+    setupCartTracking: function () {
+      // Common selectors for Add to Cart buttons in Shopify themes
+      const cartButtonSelectors = [
+        'button[name="add"]',
+        "button.add-to-cart",
+        "button.product-form--add-to-cart",
+        "button.product-form__cart-submit",
+        "button.ProductForm__AddToCart",
+        'button[data-action="add-to-cart"]',
+        'input[name="add"]',
+        "input.add-to-cart",
+        'form[action*="/cart/add"] button',
+        'form[action*="/cart/add"] input[type="submit"]',
+      ];
+
+      // Create a single selector string from the array
+      const combinedSelector = cartButtonSelectors.join(", ");
+
+      // Handle clicks on all potential add to cart buttons
+      const self = this;
+      document.addEventListener("click", (event) => {
+        // Check if the clicked element or any of its parents match our selectors
+        let element = event.target;
+        let isCartButton = false;
+
+        // Walk up the DOM tree to find if any parent is an add to cart button
+        while (element && element !== document.body) {
+          if (element.matches && element.matches(combinedSelector)) {
+            isCartButton = true;
+            break;
+          }
+          element = element.parentNode;
+        }
+
+        // If we clicked an add to cart button, track the event
+        if (isCartButton) {
+          self.trackAddToCart();
+        }
+      });
+    },
+
+    // Track add to cart events
+    trackAddToCart: function () {
+      // Get visitor data for fingerprint
+      const visitorData = this.collectVisitorData();
+      const fingerPrint = this.formatVisitorString(visitorData);
+
+      // Get vendor ID
+      const vendorId = this.getShopifyDomain();
+
+      // Create the payload
+      const payload = {
+        fingerPrint: fingerPrint,
+        page: "product", // Likely a product page if adding to cart
+        vendorId: vendorId,
+        event: "add_to_cart", // Add this to distinguish from regular page visits
+      };
+
+      // Send to server
+      fetch(TRACKING_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+        credentials: "include",
+      })
+        .then((response) => {
+          if (!response.ok) {
+            throw new Error("Network response was not ok");
+          }
+          return response.json();
+        })
+        .then((data) => {
+          console.log("Add to cart event tracked successfully");
+        })
+        .catch((error) => {
+          console.error("Error tracking add to cart event:", error);
+        });
+
+      // Log to console
+      console.log(
+        "%c Add to Cart Tracked ",
+        "background: #e83e8c; color: white; padding: 2px 6px; border-radius: 2px; font-weight: bold;"
+      );
     },
 
     // Get the Shopify store domain
@@ -315,41 +405,16 @@
       ].join("|");
     },
 
-    // Get stored token or null if not found
-    getStoredToken: function () {
-      try {
-        return localStorage.getItem(TOKEN_STORAGE_KEY);
-      } catch (e) {
-        console.error("Error accessing localStorage:", e);
-        return null;
-      }
-    },
-
-    // Store the token in localStorage
-    storeToken: function (token) {
-      try {
-        localStorage.setItem(TOKEN_STORAGE_KEY, token);
-        return true;
-      } catch (e) {
-        console.error("Error storing token in localStorage:", e);
-        return false;
-      }
-    },
-
     // Send visitor data to server
     sendToServer: function (visitorData, pageType, vendorId) {
       // Format fingerprint string
       const fingerPrint = this.formatVisitorString(visitorData);
 
-      // Get stored token if exists
-      const storedToken = this.getStoredToken();
-
       // Create the payload for the server
       const payload = {
         fingerPrint: fingerPrint,
         page: pageType,
-        token: storedToken,
-        vendorId: vendorId, // Add Shopify domain/vendor ID to the payload
+        vendorId: vendorId,
       };
 
       // Send data via fetch API
@@ -368,11 +433,7 @@
           return response.json();
         })
         .then((data) => {
-          // If server returned a token, store it
-          if (data && data.token) {
-            this.storeToken(data.token);
-            console.log("Visitor token stored successfully");
-          }
+          console.log("Page visit tracked successfully");
         })
         .catch((error) => {
           console.error("Error sending tracking data:", error);
@@ -386,7 +447,6 @@
           fingerPrint,
           pageType,
           vendorId,
-          existingToken: storedToken ? true : false,
         }
       );
     },
