@@ -298,50 +298,75 @@
       return "Unknown Device";
     },
 
-    // Detect browser name and version
+    // Detect browser name and version - UPDATED for iOS browser detection
     getBrowserInfo: function () {
       const userAgent = navigator.userAgent;
       let browserName = "Unknown";
       let browserVersion = "";
+      let actualBrowser = "Unknown"; // Track the actual browser application
 
-      // Chrome
-      if (
+      // First detect the actual browser application (Chrome, Firefox, etc.)
+      if (/CriOS/i.test(userAgent)) {
+        actualBrowser = "Chrome";
+      } else if (/FxiOS/i.test(userAgent)) {
+        actualBrowser = "Firefox";
+      } else if (/EdgiOS/i.test(userAgent)) {
+        actualBrowser = "Edge";
+      } else if (/OPiOS/i.test(userAgent)) {
+        actualBrowser = "Opera";
+      }
+
+      // iOS specific handling - all browsers use WebKit on iOS
+      if (/iPad|iPhone|iPod/.test(userAgent) && !window.MSStream) {
+        // For iOS browsers, try to get the WebKit version
+        // CriOS = Chrome for iOS, FxiOS = Firefox for iOS, etc.
+        if (/CriOS/.test(userAgent)) {
+          browserName = "Chrome"; // Report as Chrome even though it uses WebKit
+          const match = userAgent.match(/CriOS\/(\d+(\.\d+)?)/i);
+          browserVersion = match ? match[1] : "";
+        } else if (/FxiOS/.test(userAgent)) {
+          browserName = "Firefox";
+          const match = userAgent.match(/FxiOS\/(\d+(\.\d+)?)/i);
+          browserVersion = match ? match[1] : "";
+        } else if (/EdgiOS/.test(userAgent)) {
+          browserName = "Edge";
+          const match = userAgent.match(/EdgiOS\/(\d+(\.\d+)?)/i);
+          browserVersion = match ? match[1] : "";
+        } else {
+          // Standard Safari
+          browserName = "Safari";
+          const match = userAgent.match(/Version\/(\d+(\.\d+)?)/i);
+          browserVersion = match ? match[1] : "";
+        }
+      }
+      // Non-iOS browser detection
+      else if (
         /Chrome/.test(userAgent) &&
         !/Chromium|Edge|Edg|OPR|Opera|brave/i.test(userAgent)
       ) {
         browserName = "Chrome";
         const match = userAgent.match(/Chrome\/(\d+(\.\d+)?)/i);
         browserVersion = match ? match[1] : "";
-      }
-      // Firefox
-      else if (/Firefox/.test(userAgent) && !/Seamonkey/i.test(userAgent)) {
+      } else if (/Firefox/.test(userAgent) && !/Seamonkey/i.test(userAgent)) {
         browserName = "Firefox";
         const match = userAgent.match(/Firefox\/(\d+(\.\d+)?)/i);
         browserVersion = match ? match[1] : "";
-      }
-      // Edge
-      else if (/Edg/.test(userAgent)) {
+      } else if (/Edg/.test(userAgent)) {
         browserName = "Edge";
         const match = userAgent.match(/Edg\/(\d+(\.\d+)?)/i);
         browserVersion = match ? match[1] : "";
-      }
-      // Safari
-      else if (
+      } else if (
         /Safari/.test(userAgent) &&
         !/Chrome|Chromium|Edge|Edg|OPR|Opera/i.test(userAgent)
       ) {
         browserName = "Safari";
         const match = userAgent.match(/Version\/(\d+(\.\d+)?)/i);
         browserVersion = match ? match[1] : "";
-      }
-      // Internet Explorer
-      else if (/MSIE|Trident/.test(userAgent)) {
+      } else if (/MSIE|Trident/.test(userAgent)) {
         browserName = "Internet Explorer";
         const match = userAgent.match(/(?:MSIE |rv:)(\d+(\.\d+)?)/i);
         browserVersion = match ? match[1] : "";
-      }
-      // Opera
-      else if (/OPR|Opera/.test(userAgent)) {
+      } else if (/OPR|Opera/.test(userAgent)) {
         browserName = "Opera";
         const match = userAgent.match(/(?:OPR|Opera)\/(\d+(\.\d+)?)/i);
         browserVersion = match ? match[1] : "";
@@ -350,6 +375,7 @@
       return {
         name: browserName,
         version: browserVersion,
+        actualBrowser: actualBrowser, // Store the actual browser app if relevant
         userAgent: userAgent,
         language: navigator.language || "Unknown",
         cookieEnabled: navigator.cookieEnabled,
@@ -534,10 +560,18 @@
 
     // Creates a formatted string from visitor data
     formatVisitorString: function (data) {
+      // Generate a more browser-specific identifier for iOS
+      let browserIdentifier = data.browser.name;
+
+      // For iOS, add clarity about actual browser app
+      if (data.os.name === "iOS" && data.browser.actualBrowser !== "Unknown") {
+        browserIdentifier = `${data.browser.actualBrowser}(WebKit)`;
+      }
+
       // Return a pipe-delimited string of key attributes with MORE unique identifiers
       return [
         data.os.name,
-        data.browser.name,
+        browserIdentifier,
         data.browser.version.split(".")[0] || "unknown", // Major version only
         `${data.screen.width}x${data.screen.height}`,
         `${data.hardware.cores}cores-${data.hardware.memory}GB`,
