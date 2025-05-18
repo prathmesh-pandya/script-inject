@@ -146,20 +146,39 @@
     },
 
     // Determine if current page is a product page
+    // Determine the current page type based on the URL or page structure
     determinePageType: function () {
-      // This is a simple detection - adjust based on your site structure
       const url = window.location.href.toLowerCase();
+      const path = window.location.pathname.toLowerCase();
 
-      // Check for common product page indicators
-      // Adjust these patterns based on your actual URL structure
       if (
-        url.includes("/products/") ||
-        url.includes("/product/") ||
-        url.includes("/p/") ||
+        path.includes("/products/") ||
+        path.includes("/product/") ||
+        path.includes("/p/") ||
         document.querySelector(".product-detail") !== null ||
         document.querySelector("[data-product-id]") !== null
       ) {
         return "product";
+      }
+
+      if (
+        path === "/checkout" ||
+        path.startsWith("/checkouts") ||
+        path.includes("/checkout")
+      ) {
+        return "checkout";
+      }
+
+      if (path === "/cart" || path.includes("/cart")) {
+        return "cart";
+      }
+
+      if (path === "/" || path === "/index") {
+        return "home";
+      }
+
+      if (path.includes("/collections") || path.includes("/search")) {
+        return "collection_or_search";
       }
 
       return "other";
