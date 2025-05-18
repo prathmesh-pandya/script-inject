@@ -174,6 +174,9 @@
         // Browser identification
         browser: this.getBrowserInfo(),
 
+        // Device model information (NEW!)
+        deviceModel: this.getDeviceModel(),
+
         // Screen and display information
         screen: this.getScreenInfo(),
 
@@ -230,6 +233,69 @@
             userAgent
           ),
       };
+    },
+
+    // NEW! Extract device model from user agent
+    getDeviceModel: function () {
+      const userAgent = navigator.userAgent;
+
+      // For Android devices
+      if (/android/i.test(userAgent)) {
+        // Look for patterns like: Android 10; SM-G973F or Android 10; Pixel 4
+
+        // Samsung devices
+        let match = userAgent.match(/;\s+(SM-[A-Z0-9]+)/i);
+        if (match && match[1]) return match[1].trim();
+
+        // Google Pixel
+        match = userAgent.match(/;\s+(Pixel\s+[^;)]+)/i);
+        if (match && match[1]) return match[1].trim();
+
+        // Xiaomi/Redmi
+        match = userAgent.match(/;\s+(Mi\s+[^;)]+|Redmi\s+[^;)]+)/i);
+        if (match && match[1]) return match[1].trim();
+
+        // OnePlus
+        match = userAgent.match(/;\s+(OnePlus[^;)]+)/i);
+        if (match && match[1]) return match[1].trim();
+
+        // General Android model pattern
+        match = userAgent.match(
+          /Android[\s\/][\d\.]+;\s+([^;]+)(?:Build|[^\)]+\))/i
+        );
+        if (match && match[1]) {
+          // Clean up the model string
+          return match[1]
+            .trim()
+            .replace(/\sBuild.*/i, "") // Remove "Build/XXX"
+            .replace(/\sLMY.*/i, "") // Remove additional version info
+            .replace(/[;(].*/, ""); // Remove anything after ; or (
+        }
+      }
+
+      // For iOS devices
+      if (/iPad|iPhone|iPod/.test(userAgent)) {
+        let device = "Unknown iOS Device";
+
+        if (/iPad/.test(userAgent)) device = "iPad";
+        else if (/iPod/.test(userAgent)) device = "iPod";
+        else if (/iPhone/.test(userAgent)) device = "iPhone";
+
+        // Try to get iOS version
+        const match = userAgent.match(/OS (\d+[._]\d+[._]?\d*) like Mac OS X/i);
+        const version = match ? match[1].replace(/_/g, ".") : "";
+
+        if (version) return `${device} (iOS ${version})`;
+        return device;
+      }
+
+      // For desktop browsers, we can't reliably get specific model info
+      // but we can return the platform
+      if (/Windows NT|Macintosh|Linux/i.test(userAgent)) {
+        return navigator.platform || "Desktop Device";
+      }
+
+      return "Unknown Device";
     },
 
     // Detect browser name and version
@@ -320,7 +386,9 @@
       return {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown",
         timezoneOffset: new Date().getTimezoneOffset(),
-        canvasFingerprint: this.getCanvasFingerprint(),
+        canvasFingerprint: this.getEnhancedCanvasFingerprint(), // IMPROVED CANVAS FINGERPRINTING
+        // WebGL renderer info (if available)
+        webGLRenderer: this.getWebGLRenderer(),
         // Detect various browser capabilities as additional signals
         capabilities: {
           localStorage: !!window.localStorage,
@@ -333,6 +401,27 @@
           video: !!document.createElement("video").canPlayType,
         },
       };
+    },
+
+    // NEW! Get WebGL renderer info (GPU details)
+    getWebGLRenderer: function () {
+      try {
+        const canvas = document.createElement("canvas");
+        const gl =
+          canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+
+        if (!gl) return "webgl-not-supported";
+
+        const debugInfo = gl.getExtension("WEBGL_debug_renderer_info");
+        if (debugInfo) {
+          const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+          return renderer || "unknown-renderer";
+        }
+
+        return "renderer-info-not-available";
+      } catch (e) {
+        return "webgl-error";
+      }
     },
 
     // Check for WebGL support
@@ -349,52 +438,103 @@
       }
     },
 
-    // Generate a canvas fingerprint
-    getCanvasFingerprint: function () {
+    // IMPROVED: Enhanced canvas fingerprinting
+    getEnhancedCanvasFingerprint: function () {
       try {
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         if (!ctx) return "canvas-not-supported";
 
-        canvas.width = 200;
-        canvas.height = 50;
+        // Use a larger canvas for more detail
+        canvas.width = 280;
+        canvas.height = 80;
 
-        // Text with different styles
-        ctx.textBaseline = "top";
-        ctx.font = "14px Arial";
+        // Set canvas properties
+        ctx.textBaseline = "alphabetic";
+
+        // Draw background
+        ctx.fillStyle = "rgb(240, 240, 240)";
+        ctx.fillRect(0, 0, 280, 80);
+
+        // Add complex text with multiple styles and fonts
+        // First text
         ctx.fillStyle = "#F60";
-        ctx.fillRect(125, 1, 62, 20);
-        ctx.fillStyle = "#069";
-        ctx.fillText("Visitor Tracking", 2, 15);
-        ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
-        ctx.fillText("Canvas Fingerprint", 4, 30);
+        ctx.font = "14px Arial";
+        ctx.fillText("Fingerprinting", 10, 15);
 
-        // Add some shapes to make it more unique
+        // Second text with different font
+        ctx.fillStyle = "#069";
+        ctx.font = "16px Georgia";
+        ctx.fillText("DeviceID", 12, 35);
+
+        // Third text with emoji (crucial for device differences)
+        ctx.fillStyle = "rgba(102, 204, 0, 0.7)";
+        ctx.font = "12px Tahoma";
+        ctx.fillText("🦄👨‍💻✨🔒", 14, 55);
+
+        // Shapes with precise positioning to capture sub-pixel rendering differences
+        // Draw gradient rectangle
+        const gradient = ctx.createLinearGradient(0, 0, 280, 80);
+        gradient.addColorStop(0, "rgba(255, 0, 0, 0.2)");
+        gradient.addColorStop(0.5, "rgba(0, 255, 0, 0.2)");
+        gradient.addColorStop(1, "rgba(0, 0, 255, 0.2)");
+        ctx.fillStyle = gradient;
+        ctx.fillRect(150, 10, 100, 50);
+
+        // Draw circles with precise positioning
         ctx.beginPath();
-        ctx.arc(50, 25, 10, 0, Math.PI * 2);
+        ctx.arc(200, 30, 15.5, 0, Math.PI * 2);
         ctx.closePath();
+        ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
         ctx.fill();
 
-        // Create a short hash from the canvas data
-        const dataURL = canvas
-          .toDataURL()
-          .replace("data:image/png;base64,", "");
-        let hash = 0;
+        ctx.beginPath();
+        ctx.arc(230, 30, 10.5, 0, Math.PI * 2);
+        ctx.closePath();
+        ctx.fillStyle = "rgba(0, 255, 0, 0.5)";
+        ctx.fill();
 
-        for (let i = 0; i < 50 && i < dataURL.length; i++) {
-          hash = (hash << 5) - hash + dataURL.charCodeAt(i);
+        // Draw diagonal lines with precise positioning
+        ctx.strokeStyle = "rgba(0, 0, 255, 0.5)";
+        ctx.lineWidth = 0.5;
+
+        for (let i = 0; i < 8; i++) {
+          ctx.beginPath();
+          ctx.moveTo(150 + i * 5 + 0.12345, 10);
+          ctx.lineTo(150 + i * 5 + 0.12345 + 30, 60);
+          ctx.stroke();
+        }
+
+        // Get the canvas data and create a hash
+        const dataURL = canvas.toDataURL();
+
+        // For a more stable fingerprint, sample from different parts of the image
+        // to capture rendering differences across the canvas
+        const samples = [
+          dataURL.substring(0, 500), // Start
+          dataURL.substring(1000, 1500), // Middle part 1
+          dataURL.substring(dataURL.length - 500), // End
+        ];
+
+        // Create hash from the samples
+        let hash = 0;
+        const sampleStr = samples.join("");
+
+        for (let i = 0; i < sampleStr.length; i++) {
+          const char = sampleStr.charCodeAt(i);
+          hash = (hash << 5) - hash + char;
           hash = hash & hash; // Convert to 32bit integer
         }
 
         return Math.abs(hash).toString(36);
       } catch (e) {
-        return "canvas-error";
+        return "canvas-error-" + e.message.substring(0, 10);
       }
     },
 
     // Creates a formatted string from visitor data
     formatVisitorString: function (data) {
-      // Return a pipe-delimited string of key attributes
+      // Return a pipe-delimited string of key attributes with MORE unique identifiers
       return [
         data.os.name,
         data.browser.name,
@@ -402,6 +542,11 @@
         `${data.screen.width}x${data.screen.height}`,
         `${data.hardware.cores}cores-${data.hardware.memory}GB`,
         data.identifiers.canvasFingerprint,
+        data.deviceModel, // ADDED DEVICE MODEL!
+        (data.screen.pixelRatio || 1).toFixed(3), // Precise pixel ratio
+        data.identifiers.webGLRenderer
+          ? data.identifiers.webGLRenderer.substring(0, 20)
+          : "unknown-gpu", // GPU info!
       ].join("|");
     },
 
