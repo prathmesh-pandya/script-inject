@@ -613,6 +613,8 @@
         fingerPrint: fingerPrint,
         page: pageType,
         vendorId: vendorId,
+        websiteUrl: window.location.origin, // 🔥 Add full domain (e.g., https://example.com)
+        fullPageUrl: window.location.href, // Optional: Full page URL with path/query
       };
 
       // Send data via fetch API
