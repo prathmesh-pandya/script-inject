@@ -485,76 +485,67 @@
 
     // IMPROVED: Enhanced canvas fingerprinting with persistence
     getEnhancedCanvasFingerprint: function () {
-      const storageKey = "vt_canvas_fp"; // Short key name
+      const storageKey = "vt_canvas_fp"; // Your existing local storage key
 
+      // Check if a fingerprint already exists
       try {
-        // First, try to get existing fingerprint from localStorage
         const existingFingerprint = localStorage.getItem(storageKey);
         if (existingFingerprint && existingFingerprint.length >= 6) {
-          return existingFingerprint;
+          return existingFingerprint; // Reuse for returning visitors
         }
       } catch (e) {
-        // localStorage might be disabled, continue to generate
+        // If localStorage is unavailable, proceed to generate a new one
       }
 
       try {
+        // Create a unique element (timestamp + random string)
+        const uniqueElement =
+          Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+
+        // Generate the canvas fingerprint (your existing method)
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         if (!ctx) return "canvas-not-supported";
 
-        // Use fixed canvas size for consistency
         canvas.width = 280;
         canvas.height = 80;
-
-        // Set consistent properties
         ctx.textBaseline = "alphabetic";
-
-        // Draw background with solid color (avoid gradients that might vary)
         ctx.fillStyle = "#f0f0f0";
         ctx.fillRect(0, 0, 280, 80);
-
-        // Use consistent, simple text rendering
         ctx.fillStyle = "#F60";
         ctx.font = "14px Arial";
         ctx.fillText("DeviceFingerprint2024", 10, 20);
-
         ctx.fillStyle = "#069";
-        ctx.font = "16px Arial"; // Keep same font family
+        ctx.font = "16px Arial";
         ctx.fillText("StableID", 10, 45);
-
-        // Simple geometric shapes instead of complex gradients
         ctx.fillStyle = "#cc0";
         ctx.fillRect(150, 10, 80, 25);
-
         ctx.fillStyle = "rgba(255, 0, 0, 0.5)";
         ctx.beginPath();
         ctx.arc(200, 50, 12, 0, Math.PI * 2);
         ctx.fill();
 
-        // Get canvas data
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
-
-        // Create hash from pixel data (more stable than toDataURL)
         let hash = 0;
-        // Sample every 10th pixel to reduce computation and increase stability
         for (let i = 0; i < data.length; i += 40) {
           hash = ((hash << 5) - hash + data[i]) & 0xffffffff;
         }
+        const canvasHash = Math.abs(hash).toString(36).substring(0, 6);
 
-        // Convert to base36 and take first 6 characters
-        const fingerprint = Math.abs(hash).toString(36).substring(0, 6);
+        // Combine canvas hash with the unique element
+        const fingerprint = `${canvasHash}-${uniqueElement}`;
 
+        // Store the new fingerprint
         try {
-          // Store the fingerprint for future use
           localStorage.setItem(storageKey, fingerprint);
         } catch (e) {
-          // If storage fails, just return the computed value
+          // If storage fails, just return the fingerprint
         }
 
         return fingerprint;
       } catch (e) {
-        // If canvas fails, return a consistent fallback
+        // Fallback if something goes wrong
         return "cnv" + (navigator.userAgent.length % 1000).toString(36);
       }
     },
