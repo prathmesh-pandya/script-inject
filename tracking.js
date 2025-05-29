@@ -416,10 +416,22 @@
       };
     },
 
-    // Get hardware information
     getHardwareInfo: function () {
+      // Helper to get consistent core count
+      function getConsistentCoreCount() {
+        const storageKey = "device_core_count";
+        let coreCount = localStorage.getItem(storageKey);
+
+        if (!coreCount) {
+          coreCount = navigator.hardwareConcurrency || "Unknown";
+          localStorage.setItem(storageKey, coreCount);
+        }
+
+        return coreCount;
+      }
+
       return {
-        cores: navigator.hardwareConcurrency || "Unknown",
+        cores: getConsistentCoreCount(),
         memory: navigator.deviceMemory || "Unknown",
         maxTouchPoints: navigator.maxTouchPoints || 0,
         platform: navigator.platform || "Unknown",
@@ -485,7 +497,7 @@
 
     // IMPROVED: Enhanced canvas fingerprinting with persistence
     getEnhancedCanvasFingerprint: function () {
-      const storageKey = "vt_canvas_fp"; // Your existing local storage key
+      const storageKey = "vt_canvas_fp_v2"; // Your existing local storage key
 
       // Check if a fingerprint already exists
       try {
