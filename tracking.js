@@ -430,9 +430,22 @@
         return coreCount;
       }
 
+      // Helper to get consistent memory count
+      function getConsistentMemory() {
+        const storageKey = "device_memory_count";
+        let memoryCount = localStorage.getItem(storageKey);
+
+        if (!memoryCount) {
+          memoryCount = navigator.deviceMemory || "Unknown";
+          localStorage.setItem(storageKey, memoryCount);
+        }
+
+        return memoryCount;
+      }
+
       return {
         cores: getConsistentCoreCount(),
-        memory: navigator.deviceMemory || "Unknown",
+        memory: getConsistentMemory(),
         maxTouchPoints: navigator.maxTouchPoints || 0,
         platform: navigator.platform || "Unknown",
       };
