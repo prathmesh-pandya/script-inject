@@ -125,6 +125,8 @@
         page: "product", // Likely a product page if adding to cart
         vendorId: vendorId,
         event: "add_to_cart", // Add this to distinguish from regular page visits
+        websiteUrl: window.location.origin, // ADDED: Matches page visit payload
+        fullPageUrl: window.location.href, // ADDED: Matches page visit payload
       };
 
       // Send to server
