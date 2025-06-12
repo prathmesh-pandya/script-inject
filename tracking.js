@@ -36,6 +36,7 @@
     setupCartTracking: function () {
       // Common selectors for Add to Cart buttons in Shopify themes
       const cartButtonSelectors = [
+        // Your existing selectors:
         'button[name="add"]',
         "button.add-to-cart",
         "button.product-form--add-to-cart",
@@ -46,6 +47,41 @@
         "input.add-to-cart",
         'form[action*="/cart/add"] button',
         'form[action*="/cart/add"] input[type="submit"]',
+
+        // *** NEW POSSIBLE SELECTORS TO ADD: ***
+
+        // Generic button/input types:
+        'input[type="submit"][name="add"]',
+        'input[type="button"][name="add"]',
+
+        // Common classes from various themes (Debut, Supply, Brooklyn, Narrative, etc.):
+        ".product__add-to-cart",
+        ".add-to-cart-btn",
+        ".btn--add-to-cart",
+        ".add-to-cart-button",
+        ".single_add_to_cart_button", // Some themes might borrow from WooCommerce patterns
+        ".js-add-to-cart", // Generic JS hook
+        ".shopify-payment-button__button", // Sometimes buy-now buttons also add to cart
+        "button.add-to-cart--button",
+        "input.add-to-cart--input",
+
+        // Data attributes often used for JS hooks or identifying elements:
+        "[data-cart-submit]",
+        "[data-add-to-cart]",
+        "[data-buy-button]",
+        "[data-product-submit-button]",
+        '[data-button-action="add-to-cart"]',
+
+        // Form specific selectors (in case the form itself has an id/class):
+        'form#AddToCartForm button[type="submit"]', // Common form ID
+        'form[action="/cart/add"] button', // More specific form action targeting
+        'form.product-form button[type="submit"]',
+        'form.shopify-product-form button[type="submit"]',
+
+        // Specific to quick-view modals or AJAX carts:
+        ".js-quick-view-add-to-cart", // If quick-view has its own button
+        ".modal__add-to-cart-button", // Button inside a modal
+        ".cart-drawer__add-to-cart", // For themes with cart drawers
       ];
 
       // Create a single selector string from the array
