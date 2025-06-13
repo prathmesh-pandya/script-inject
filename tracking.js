@@ -11,6 +11,24 @@
 
   // Create tracking object
   window.visitorTracker = {
+    // Cookie helper functions
+    setCookie: function (name, value, days) {
+      const d = new Date();
+      d.setTime(d.getTime() + days * 24 * 60 * 60 * 1000);
+      document.cookie =
+        name +
+        "=" +
+        value +
+        ";expires=" +
+        d.toUTCString() +
+        ";path=/;SameSite=Lax";
+    },
+
+    getCookie: function (name) {
+      const v = document.cookie.match("(^|;) ?" + name + "=([^;]*)(;|$)");
+      return v ? v[2] : null;
+    },
+
     // Main method to collect visitor data and send to server
     init: function () {
       // Collect all identifying information
@@ -455,29 +473,25 @@
     },
 
     getHardwareInfo: function () {
-      // Helper to get consistent core count
-      function getConsistentCoreCount() {
-        const storageKey = "device_core_count";
-        let coreCount = localStorage.getItem(storageKey);
+      const self = this;
 
+      // Helper to get consistent core count - CHANGED TO USE COOKIES
+      function getConsistentCoreCount() {
+        let coreCount = self.getCookie("vt_cores");
         if (!coreCount) {
           coreCount = navigator.hardwareConcurrency || "Unknown";
-          localStorage.setItem(storageKey, coreCount);
+          self.setCookie("vt_cores", coreCount, 365);
         }
-
         return coreCount;
       }
 
-      // Helper to get consistent memory count
+      // Helper to get consistent memory count - CHANGED TO USE COOKIES
       function getConsistentMemory() {
-        const storageKey = "device_memory_count";
-        let memoryCount = localStorage.getItem(storageKey);
-
+        let memoryCount = self.getCookie("vt_mem");
         if (!memoryCount) {
           memoryCount = navigator.deviceMemory || "Unknown";
-          localStorage.setItem(storageKey, memoryCount);
+          self.setCookie("vt_mem", memoryCount, 365);
         }
-
         return memoryCount;
       }
 
@@ -546,18 +560,12 @@
       }
     },
 
-    // IMPROVED: Enhanced canvas fingerprinting with persistence
+    // IMPROVED: Enhanced canvas fingerprinting with persistence - CHANGED TO USE COOKIES
     getEnhancedCanvasFingerprint: function () {
-      const storageKey = "vt_canvas_fp_v2"; // Your existing local storage key
-
-      // Check if a fingerprint already exists
-      try {
-        const existingFingerprint = localStorage.getItem(storageKey);
-        if (existingFingerprint && existingFingerprint.length >= 6) {
-          return existingFingerprint; // Reuse for returning visitors
-        }
-      } catch (e) {
-        // If localStorage is unavailable, proceed to generate a new one
+      // Check cookie for existing fingerprint
+      const cookieFP = this.getCookie("vt_fp");
+      if (cookieFP && cookieFP.length >= 6) {
+        return cookieFP; // Reuse existing fingerprint
       }
 
       try {
@@ -599,12 +607,8 @@
         // Combine canvas hash with the unique element
         const fingerprint = `${canvasHash}-${uniqueElement}`;
 
-        // Store the new fingerprint
-        try {
-          localStorage.setItem(storageKey, fingerprint);
-        } catch (e) {
-          // If storage fails, just return the fingerprint
-        }
+        // Store in cookie (1 year)
+        this.setCookie("vt_fp", fingerprint, 365);
 
         return fingerprint;
       } catch (e) {
