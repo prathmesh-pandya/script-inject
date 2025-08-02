@@ -7,7 +7,7 @@
 (function () {
   // API endpoint for tracking
   const TRACKING_API_URL =
-    "https://my.pilotseat.in/api/v1/customer/page-visits";
+    "https://tough-curiously-minnow.ngrok-free.app/api/v1/customer/page-visits";
 
   // Create tracking object
   window.visitorTracker = {
