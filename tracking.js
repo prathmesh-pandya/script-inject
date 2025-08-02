@@ -29,6 +29,18 @@
       return v ? v[2] : null;
     },
 
+    // Generate or retrieve a unique session ID
+    getOrCreateSessionId: function () {
+      let sessionId = this.getCookie("vt_sid");
+      if (!sessionId) {
+        // Generate UUID-like session ID
+        sessionId =
+          Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
+        this.setCookie("vt_sid", sessionId, 365); // 1 year expiry
+      }
+      return sessionId;
+    },
+
     // Main method to collect visitor data and send to server
     init: function () {
       // Collect all identifying information
@@ -132,19 +144,27 @@
     trackAddToCart: function () {
       // Get visitor data for fingerprint
       const visitorData = this.collectVisitorData();
-      const fingerPrint = this.formatVisitorString(visitorData);
+
+      // Generate all three fingerprints
+      const fingerPrint = this.formatVisitorString(visitorData); // Legacy format
+      const stableFingerprint = this.formatStableFingerprint(visitorData);
+      const variableFingerprint = this.formatVariableFingerprint(visitorData);
+      const sessionId = this.getOrCreateSessionId();
 
       // Get vendor ID
       const vendorId = this.getShopifyDomain();
 
-      // Create the payload
+      // Create the payload with new fields
       const payload = {
-        fingerPrint: fingerPrint,
+        fingerPrint: fingerPrint, // Keep for backward compatibility
+        sessionId: sessionId,
+        stableFingerprint: stableFingerprint,
+        variableFingerprint: variableFingerprint,
         page: "product", // Likely a product page if adding to cart
         vendorId: vendorId,
         event: "add_to_cart", // Add this to distinguish from regular page visits
-        websiteUrl: window.location.origin, // ADDED: Matches page visit payload
-        fullPageUrl: window.location.href, // ADDED: Matches page visit payload
+        websiteUrl: window.location.origin,
+        fullPageUrl: window.location.href,
       };
 
       // Send to server
@@ -508,7 +528,7 @@
       return {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || "Unknown",
         timezoneOffset: new Date().getTimezoneOffset(),
-        canvasFingerprint: this.getEnhancedCanvasFingerprint(), // IMPROVED CANVAS FINGERPRINTING
+        canvasFingerprint: this.getStableCanvasFingerprint(), // RENAMED AND STABILIZED
         // WebGL renderer info (if available)
         webGLRenderer: this.getWebGLRenderer(),
         // Detect various browser capabilities as additional signals
@@ -560,8 +580,8 @@
       }
     },
 
-    // IMPROVED: Enhanced canvas fingerprinting with persistence - CHANGED TO USE COOKIES
-    getEnhancedCanvasFingerprint: function () {
+    // STABILIZED: Canvas fingerprinting without random components
+    getStableCanvasFingerprint: function () {
       // Check cookie for existing fingerprint
       const cookieFP = this.getCookie("vt_fp");
       if (cookieFP && cookieFP.length >= 6) {
@@ -569,11 +589,7 @@
       }
 
       try {
-        // Create a unique element (timestamp + random string)
-        const uniqueElement =
-          Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
-
-        // Generate the canvas fingerprint (your existing method)
+        // Generate the canvas fingerprint (stable, no random elements)
         const canvas = document.createElement("canvas");
         const ctx = canvas.getContext("2d");
         if (!ctx) return "canvas-not-supported";
@@ -602,10 +618,9 @@
         for (let i = 0; i < data.length; i += 40) {
           hash = ((hash << 5) - hash + data[i]) & 0xffffffff;
         }
-        const canvasHash = Math.abs(hash).toString(36).substring(0, 6);
 
-        // Combine canvas hash with the unique element
-        const fingerprint = `${canvasHash}-${uniqueElement}`;
+        // Just use the stable canvas hash without any random components
+        const fingerprint = Math.abs(hash).toString(36).substring(0, 8);
 
         // Store in cookie (1 year)
         this.setCookie("vt_fp", fingerprint, 365);
@@ -617,7 +632,7 @@
       }
     },
 
-    // Creates a formatted string from visitor data
+    // Creates a formatted string from visitor data (LEGACY - for backward compatibility)
     formatVisitorString: function (data) {
       // Generate a more browser-specific identifier for iOS
       let browserIdentifier = data.browser.name;
@@ -643,18 +658,54 @@
       ].join("|");
     },
 
+    // NEW: Format stable fingerprint (only unchanging components)
+    formatStableFingerprint: function (data) {
+      // For iOS browsers, use actual browser if known
+      let browserIdentifier = data.browser.name;
+      if (data.os.name === "iOS" && data.browser.actualBrowser !== "Unknown") {
+        browserIdentifier = `${data.browser.actualBrowser}(WebKit)`;
+      }
+
+      return [
+        data.os.name,
+        browserIdentifier,
+        data.deviceModel,
+        `${data.screen.width}x${data.screen.height}`,
+        data.identifiers.timezone,
+        data.identifiers.canvasFingerprint,
+      ].join("|");
+    },
+
+    // NEW: Format variable fingerprint (components that can change)
+    formatVariableFingerprint: function (data) {
+      return [
+        data.browser.version.split(".")[0] || "unknown",
+        `${data.hardware.cores}cores`,
+        `${data.hardware.memory}GB`,
+        data.identifiers.webGLRenderer
+          ? data.identifiers.webGLRenderer.substring(0, 20)
+          : "unknown-gpu",
+      ].join("|");
+    },
+
     // Send visitor data to server
     sendToServer: function (visitorData, pageType, vendorId) {
-      // Format fingerprint string
-      const fingerPrint = this.formatVisitorString(visitorData);
+      // Generate all three fingerprints
+      const fingerPrint = this.formatVisitorString(visitorData); // Legacy format
+      const stableFingerprint = this.formatStableFingerprint(visitorData);
+      const variableFingerprint = this.formatVariableFingerprint(visitorData);
+      const sessionId = this.getOrCreateSessionId();
 
-      // Create the payload for the server
+      // Create the payload for the server with new fields
       const payload = {
-        fingerPrint: fingerPrint,
+        fingerPrint: fingerPrint, // Keep for backward compatibility
+        sessionId: sessionId, // NEW
+        stableFingerprint: stableFingerprint, // NEW
+        variableFingerprint: variableFingerprint, // NEW
         page: pageType,
         vendorId: vendorId,
-        websiteUrl: window.location.origin, // 🔥 Add full domain (e.g., https://example.com)
-        fullPageUrl: window.location.href, // Optional: Full page URL with path/query
+        websiteUrl: window.location.origin,
+        fullPageUrl: window.location.href,
       };
 
       // Send data via fetch API
@@ -684,7 +735,10 @@
         "%c Visitor Tracking Data ",
         "background: #4834d4; color: white; padding: 2px 6px; border-radius: 2px; font-weight: bold;",
         {
+          sessionId,
           fingerPrint,
+          stableFingerprint,
+          variableFingerprint,
           pageType,
           vendorId,
         }
